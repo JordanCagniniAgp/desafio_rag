@@ -3,7 +3,7 @@
 Assistente em Python que responde perguntas em linguagem natural sobre os três PDFs de
 `documentos/` (Política de Reembolso, Política de Utilização de Veículos e Procedimento de
 Solicitação de Férias). Toda resposta cita a fonte; se os documentos não tratam do assunto,
-o assistente avisa em vez de inventar. Tudo fica em um único arquivo, `app.py`, com menos de 200 linhas.
+o assistente avisa em vez de inventar. Tudo fica em um único arquivo, `app.py`.
 
 ## Instalação e execução
 
