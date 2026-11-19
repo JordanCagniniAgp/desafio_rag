@@ -1,8 +1,3 @@
-"""Assistente RAG mínimo: responde sobre os PDFs de documentos/ citando a fonte.
-
-Uso: streamlit run app.py        (tela)
-     python app.py --validar     (perguntas de validação no terminal)
-"""
 import math
 import os
 import re
@@ -18,7 +13,7 @@ load_dotenv(PASTA / ".env")
 MODELOS = [m for m in dict.fromkeys([os.getenv("MODELO_IA", "gemini-3.1-flash-lite"),
                                      os.getenv("MODELO_IA_RESERVA", "gemini-3.5-flash-lite")]) if m]
 MODELO_EMBEDDING = os.getenv("MODELO_EMBEDDING", "gemini-embedding-001")
-LIMIAR = 0.65  # similaridade mínima para considerar que algum trecho trata do assunto
+LIMIAR = 0.65  
 SEM = "SEM_EVIDENCIA"
 RECUSA = ("Não encontrei isso nos documentos que consulto (reembolso, veículos e férias), "
           "então prefiro não responder para não te passar algo errado.")
@@ -51,12 +46,10 @@ Responda só ao que foi dito (a um "olá", não diga como você está).
 - Para qualquer outra mensagem, responda apenas: {SEM}"""
 
 
-TITULO = re.compile(r"\d+(?:\.\d+)*\.?\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][^.;:]{2,70}(?<!,)")  # "3. Como solicitar"
+TITULO = re.compile(r"\d+(?:\.\d+)*\.?\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][^.;:]{2,70}(?<!,)") 
 
 
 def ler_documentos(pasta=PASTA / "documentos"):
-    """Um trecho por seção numerada e um por pergunta do FAQ, com arquivo, seção e página.
-    Linhas repetidas em todas as páginas (cabeçalho e rodapé) e "Página N" são descartadas."""
     trechos = []
     for pdf in sorted(pasta.glob("*.pdf")):
         paginas = [(p.extract_text() or "").splitlines() for p in PdfReader(pdf).pages]
@@ -67,7 +60,7 @@ def ler_documentos(pasta=PASTA / "documentos"):
                 if not linha or linha in repetidas or re.fullmatch(r"P[áa]gina \d+", linha):
                     continue
                 faq = "Perguntas frequentes" in secao and linha.endswith("?")
-                if TITULO.fullmatch(linha) or faq:  # começa um trecho novo
+                if TITULO.fullmatch(linha) or faq: 
                     trechos.append(atual)
                     secao = secao if faq else linha
                     atual = {"secao": f"{secao} > {linha}" if faq else linha, "pagina": pagina, "linhas": []}
@@ -85,7 +78,6 @@ def cosseno(a, b):
 
 
 def conectar():
-    """Funções de embedding e de geração de texto da API (Gemini, compatível com OpenAI)."""
     cliente = OpenAI(api_key=os.getenv("GEMINI_API_KEY") or "sem-chave", timeout=30, max_retries=0,
                      base_url=os.getenv("IA_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai"))
 
@@ -93,7 +85,7 @@ def conectar():
         return [d.embedding for i in range(0, len(textos), 50)
                 for d in cliente.with_options(max_retries=2).embeddings.create(model=MODELO_EMBEDDING, input=textos[i:i + 50]).data]
 
-    def gerar(sistema, usuario):  # lento ou sobrecarregado: passa logo para o modelo reserva
+    def gerar(sistema, usuario): 
         for modelo in MODELOS:
             try:
                 r = cliente.chat.completions.create(model=modelo, messages=[
@@ -106,10 +98,9 @@ def conectar():
 
 
 def responder(pergunta, trechos, vetores, embed, gerar, k=6):
-    """Devolve (texto, fontes). Sem fontes = conversa ou recusa."""
     consulta = embed([pergunta])[0]
     notas = sorted(((cosseno(consulta, v), i) for i, v in enumerate(vetores)), reverse=True)[:k]
-    if notas[0][0] < LIMIAR:  # nada relacionado: só conversa ("olá", "obrigado") ou recusa
+    if notas[0][0] < LIMIAR: 
         conversa = gerar(PROMPT_CONVERSA, pergunta).strip()
         recusar = SEM in conversa or re.search(r"\d", conversa) or len(conversa) > 300
         return (RECUSA if recusar else conversa), []
@@ -118,7 +109,7 @@ def responder(pergunta, trechos, vetores, embed, gerar, k=6):
                            for n, t in enumerate(escolhidos, start=1))
     texto = gerar(PROMPT, f"Trechos:\n\n{contexto}\n\nPergunta: {pergunta}").strip()
     citados = sorted({int(n) for n in re.findall(r"\[(\d+)\]", texto) if 1 <= int(n) <= len(escolhidos)})
-    if SEM in texto or not citados:  # resposta sem fonte válida não é mostrada
+    if SEM in texto or not citados: 
         return RECUSA, []
     return texto, [(n, escolhidos[n - 1]) for n in citados]
 
@@ -135,7 +126,7 @@ def validar():
     for pergunta in PERGUNTAS + ["Qual é o valor do vale-alimentação?"]:
         try:
             texto, fontes = responder(pergunta, trechos, vetores, embed, gerar)
-        except Exception as erro:  # IA lenta ou fora do ar: registra e segue para a próxima
+        except Exception as erro: 
             texto, fontes = f"(erro ao consultar a IA: {erro})", []
         print(f"Pergunta: {pergunta}\nResposta: {texto}")
         print("".join(f"  [{n}] {t['arquivo']} · {t['secao']} · p. {t['pagina']}\n" for n, t in fontes))
@@ -164,7 +155,7 @@ def tela():
                                use_container_width=True)
         st.button("Nova conversa", on_click=historico.clear, use_container_width=True)
 
-    def escolher(p):  # trocar a chave fecha a lista de perguntas depois do clique
+    def escolher(p):  
         st.session_state.update(pendente=p, versao=st.session_state.get("versao", 0) + 1)
     with st.popover("Perguntas de validação", key=f"perguntas_{st.session_state.get('versao', 0)}"):
         for p in PERGUNTAS:
